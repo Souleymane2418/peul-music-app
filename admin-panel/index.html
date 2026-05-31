@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Peul Music — Panel Admin</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --gold: #C9A227; --green: #2E8B57; --bg: #0a0a0a;
+      --surface: #121212; --card: #1e1e1e; --border: #2a2a2a;
+      --text: #ffffff; --muted: #888;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Login */
+    #login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; width: 380px; text-align: center; }
+    .login-logo { font-size: 48px; margin-bottom: 12px; }
+    .login-title { font-size: 24px; font-weight: 700; color: var(--gold); margin-bottom: 6px; }
+    .login-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+    input { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-size: 14px; margin-bottom: 12px; outline: none; }
+    input:focus { border-color: var(--gold); }
+    .btn-gold { width: 100%; background: linear-gradient(135deg, var(--gold), var(--green)); border: none; border-radius: 10px; padding: 14px; color: #0a0a0a; font-weight: 700; font-size: 15px; cursor: pointer; }
+    .btn-gold:hover { opacity: 0.9; }
+    .error-msg { color: #e74c3c; font-size: 13px; margin-top: 8px; }
+
+    /* Layout */
+    #app { display: none; }
+    .sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); height: 100vh; position: fixed; left: 0; top: 0; padding: 20px 0; display: flex; flex-direction: column; }
+    .sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+    .sidebar-logo .app-name { font-size: 18px; font-weight: 700; color: var(--gold); }
+    .sidebar-logo .admin-badge { font-size: 11px; color: var(--muted); }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; color: var(--muted); font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+    .nav-item:hover { color: var(--text); background: var(--card); }
+    .nav-item.active { color: var(--gold); border-left-color: var(--gold); background: rgba(201,162,39,0.08); }
+    .nav-icon { font-size: 18px; width: 22px; }
+    .sidebar-footer { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+    .logout-btn { font-size: 13px; color: var(--muted); cursor: pointer; }
+    .logout-btn:hover { color: #e74c3c; }
+
+    /* Main */
+    .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .page-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+    .page-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+
+    /* Stats cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+    .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--text); }
+    .stat-sub { font-size: 12px; color: var(--green); margin-top: 4px; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; }
+    th { background: var(--surface); padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 12px 16px; border-top: 1px solid var(--border); font-size: 14px; }
+    tr:hover td { background: rgba(255,255,255,0.03); }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-gold { background: rgba(201,162,39,0.2); color: var(--gold); }
+    .badge-green { background: rgba(46,139,87,0.2); color: var(--green); }
+    .badge-gray { background: rgba(136,136,136,0.2); color: var(--muted); }
+    .badge-red { background: rgba(231,76,60,0.2); color: #e74c3c; }
+
+    /* Upload form */
+    .upload-form { background: var(--card); border-radius: 16px; padding: 28px; border: 1px solid var(--border); max-width: 700px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-group input, .form-group select, .form-group textarea { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; }
+    .form-group textarea { min-height: 80px; resize: vertical; }
+    .form-group select option { background: var(--surface); }
+    .form-group input:focus, .form-group select:focus { border-color: var(--gold); }
+    .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 32px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: all 0.2s; }
+    .upload-zone:hover { border-color: var(--gold); background: rgba(201,162,39,0.05); }
+    .upload-icon { font-size: 36px; margin-bottom: 10px; }
+    .upload-text { color: var(--muted); font-size: 14px; }
+    .upload-text strong { color: var(--gold); }
+    .btn-submit { background: linear-gradient(135deg, var(--gold), var(--green)); border: none; border-radius: 10px; padding: 12px 28px; color: #0a0a0a; font-weight: 700; font-size: 15px; cursor: pointer; }
+    .btn-small { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+    .btn-small:hover { color: var(--text); border-color: var(--text); }
+    .btn-danger { color: #e74c3c !important; border-color: #e74c3c !important; }
+    .success-msg { color: var(--green); font-size: 13px; margin-top: 12px; }
+
+    /* Responsive */
+    @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .form-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<!-- PAGE LOGIN -->
+<div id="login-page">
+  <div class="login-box">
+    <div class="login-logo">🎵</div>
+    <div class="login-title">Peul Music Admin</div>
+    <div class="login-sub">Connecte-toi avec ton compte administrateur</div>
+    <input type="email" id="login-email" placeholder="Email administrateur" />
+    <input type="password" id="login-password" placeholder="Mot de passe" />
+    <button class="btn-gold" onclick="login()">Se connecter</button>
+    <div class="error-msg" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP PRINCIPALE -->
+<div id="app" style="display:none;">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div>🎵 <span class="app-name">Peul Music</span></div>
+      <div class="admin-badge">Panel Admin</div>
+    </div>
+    <div class="nav-item active" onclick="showPage('dashboard')">
+      <span class="nav-icon">📊</span> Tableau de bord
+    </div>
+    <div class="nav-item" onclick="showPage('upload')">
+      <span class="nav-icon">🎵</span> Ajouter une musique
+    </div>
+    <div class="nav-item" onclick="showPage('songs')">
+      <span class="nav-icon">📋</span> Gérer les musiques
+    </div>
+    <div class="nav-item" onclick="showPage('artists')">
+      <span class="nav-icon">🎤</span> Artistes
+    </div>
+    <div class="nav-item" onclick="showPage('users')">
+      <span class="nav-icon">👥</span> Utilisateurs
+    </div>
+    <div class="nav-item" onclick="showPage('revenue')">
+      <span class="nav-icon">💰</span> Revenus
+    </div>
+    <div class="sidebar-footer">
+      <div class="logout-btn" onclick="logout()">⬅ Se déconnecter</div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">Tableau de bord</div>
+      <div class="page-sub">Vue d'ensemble de Peul Music</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total musiques</div>
+          <div class="stat-value" id="stat-songs">—</div>
+          <div class="stat-sub">publiées</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Artistes</div>
+          <div class="stat-value" id="stat-artists">—</div>
+          <div class="stat-sub">vérifiés & non vérifiés</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Utilisateurs</div>
+          <div class="stat-value" id="stat-users">—</div>
+          <div class="stat-sub">inscrits</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Abonnés Premium</div>
+          <div class="stat-value" id="stat-premium">—</div>
+          <div class="stat-sub" style="color: var(--gold);">actifs</div>
+        </div>
+      </div>
+      <h3 style="margin-bottom:16px; font-size:16px;">Musiques récentes en attente de validation</h3>
+      <table id="pending-songs-table">
+        <thead><tr><th>Titre</th><th>Artiste</th><th>Pays</th><th>Génération</th><th>Action</th></tr></thead>
+        <tbody id="pending-songs-body"><tr><td colspan="5" style="text-align:center; color:var(--muted)">Chargement...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- UPLOAD -->
+    <div class="page" id="page-upload">
+      <div class="page-title">Ajouter une musique</div>
+      <div class="page-sub">Upload un fichier audio et ses métadonnées</div>
+      <div class="upload-form">
+        <!-- Zone upload audio -->
+        <div class="upload-zone" onclick="document.getElementById('audio-file').click()">
+          <input type="file" id="audio-file" accept="audio/*" style="display:none" onchange="onAudioSelected(this)" />
+          <div class="upload-icon">🎵</div>
+          <div class="upload-text"><strong>Clique pour sélectionner</strong> un fichier MP3/AAC/FLAC</div>
+          <div id="audio-filename" style="margin-top:8px; font-size:13px; color:var(--gold);"></div>
+        </div>
+
+        <!-- Métadonnées -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Titre *</label>
+            <input type="text" id="song-title" placeholder="Titre de la chanson" />
+          </div>
+          <div class="form-group">
+            <label>Artiste *</label>
+            <input type="text" id="song-artist" placeholder="Nom de l'artiste" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Pays *</label>
+            <select id="song-country">
+              <option value="">Sélectionner...</option>
+              <option>Sénégal</option><option>Guinée</option><option>Mali</option>
+              <option>Nigeria</option><option>Cameroun</option><option>Niger</option>
+              <option>Burkina Faso</option><option>Mauritanie</option><option>Gambie</option>
+              <option>Sierra Leone</option><option>Ghana</option><option>Côte d'Ivoire</option><option>Diaspora</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Génération *</label>
+            <select id="song-generation">
+              <option value="">Sélectionner...</option>
+              <option>Traditionnelle</option><option>Années 60-70</option>
+              <option>Années 80-90</option><option>Moderne 2000+</option><option>Contemporaine</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Dialecte / Langue *</label>
+            <select id="song-language">
+              <option value="">Sélectionner...</option>
+              <option>Pulaar</option><option>Pular</option><option>Fulfulde</option>
+              <option>Fula</option><option>Haalpulaar</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Genre *</label>
+            <select id="song-genre">
+              <option value="">Sélectionner...</option>
+              <option>Traditionnel</option><option>Griot</option><option>Wassoulou</option>
+              <option>Moderne</option><option>Religieux</option><option>Diaspora</option><option>Fusion</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Année *</label>
+            <input type="number" id="song-year" placeholder="ex: 1995" min="1900" max="2030" />
+          </div>
+          <div class="form-group">
+            <label>Réservé Premium ?</label>
+            <select id="song-premium">
+              <option value="false">Non — accessible à tous</option>
+              <option value="true">Oui — Premium uniquement</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:20px;">
+          <label>Paroles (optionnel)</label>
+          <textarea id="song-lyrics" placeholder="Colle les paroles ici..."></textarea>
+        </div>
+
+        <button class="btn-submit" onclick="uploadSong()">⬆ Publier la musique</button>
+        <div id="upload-message"></div>
+      </div>
+    </div>
+
+    <!-- SONGS LIST -->
+    <div class="page" id="page-songs">
+      <div class="page-title">Gérer les musiques</div>
+      <div class="page-sub">Toutes les musiques de la bibliothèque</div>
+      <table>
+        <thead><tr><th>Titre</th><th>Artiste</th><th>Pays</th><th>Génération</th><th>Langue</th><th>Statut</th><th>Écoutes</th><th>Actions</th></tr></thead>
+        <tbody id="songs-list-body"><tr><td colspan="8" style="text-align:center; color:var(--muted)">Chargement...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- ARTISTS -->
+    <div class="page" id="page-artists">
+      <div class="page-title">Artistes</div>
+      <div class="page-sub">Gestion des artistes peuls</div>
+      <table>
+        <thead><tr><th>Nom</th><th>Pays</th><th>Génération</th><th>Vérifié</th><th>Abonnés</th><th>Actions</th></tr></thead>
+        <tbody id="artists-list-body"><tr><td colspan="6" style="text-align:center; color:var(--muted)">Chargement...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- USERS -->
+    <div class="page" id="page-users">
+      <div class="page-title">Utilisateurs</div>
+      <div class="page-sub">Gestion des comptes</div>
+      <table>
+        <thead><tr><th>Email</th><th>Nom</th><th>Rôle</th><th>Abonnement</th><th>Inscrit le</th><th>Actions</th></tr></thead>
+        <tbody id="users-list-body"><tr><td colspan="6" style="text-align:center; color:var(--muted)">Chargement...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- REVENUE -->
+    <div class="page" id="page-revenue">
+      <div class="page-title">Revenus</div>
+      <div class="page-sub">Statistiques financières</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Revenu mensuel</div>
+          <div class="stat-value" id="rev-monthly">—</div>
+          <div class="stat-sub">abonnés × 2.99€</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Revenu annuel</div>
+          <div class="stat-value" id="rev-yearly-subs">—</div>
+          <div class="stat-sub">abonnés annuels × 19.99€</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total abonnés actifs</div>
+          <div class="stat-value" id="rev-total-subs">—</div>
+          <div class="stat-sub" style="color:var(--gold)">payants</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Revenu total estimé/mois</div>
+          <div class="stat-value" id="rev-total">—</div>
+          <div class="stat-sub">mensuel + annuel / 12</div>
+        </div>
+      </div>
+      <p style="color:var(--muted); font-size:13px;">💡 Pour les paiements réels, connecte <strong style="color:var(--gold)">Stripe</strong> depuis le dashboard Supabase → Edge Functions.</p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// =============================================
+// CONFIGURATION SUPABASE
+// 👉 Remplace par tes vraies valeurs
+// =============================================
+const SUPABASE_URL = 'https://TON_PROJECT_ID.supabase.co';
+const SUPABASE_ANON_KEY = 'TON_ANON_KEY';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// =============================================
+// AUTHENTIFICATION
+// =============================================
+async function login() {
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  document.getElementById('login-error').textContent = '';
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+  if (error) { document.getElementById('login-error').textContent = 'Email ou mot de passe incorrect'; return; }
+
+  const { data: profile } = await db.from('profiles').select('role').eq('id', data.user.id).single();
+  if (profile?.role !== 'admin') {
+    await db.auth.signOut();
+    document.getElementById('login-error').textContent = 'Accès refusé — compte admin requis';
+    return;
+  }
+
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  loadDashboard();
+}
+
+async function logout() {
+  await db.auth.signOut();
+  location.reload();
+}
+
+// =============================================
+// NAVIGATION
+// =============================================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'songs') loadSongs();
+  if (name === 'artists') loadArtists();
+  if (name === 'users') loadUsers();
+  if (name === 'revenue') loadRevenue();
+}
+
+// =============================================
+// DASHBOARD
+// =============================================
+async function loadDashboard() {
+  const [songs, artists, users, premium, pending] = await Promise.all([
+    db.from('songs').select('id', { count: 'exact' }).eq('published', true),
+    db.from('artists').select('id', { count: 'exact' }),
+    db.from('profiles').select('id', { count: 'exact' }),
+    db.from('profiles').select('id', { count: 'exact' }).eq('role', 'premium'),
+    db.from('songs').select('id, title, artists(name), country, generation').eq('published', false).limit(10),
+  ]);
+
+  document.getElementById('stat-songs').textContent = songs.count || 0;
+  document.getElementById('stat-artists').textContent = artists.count || 0;
+  document.getElementById('stat-users').textContent = users.count || 0;
+  document.getElementById('stat-premium').textContent = premium.count || 0;
+
+  const tbody = document.getElementById('pending-songs-body');
+  if (!pending.data || pending.data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--muted)">Aucune musique en attente ✓</td></tr>';
+    return;
+  }
+  tbody.innerHTML = pending.data.map(s => `
+    <tr>
+      <td>${s.title}</td>
+      <td>${s.artists?.name || '—'}</td>
+      <td>${s.country}</td>
+      <td>${s.generation}</td>
+      <td>
+        <button class="btn-small" onclick="publishSong('${s.id}', true)">✓ Publier</button>
+        <button class="btn-small btn-danger" onclick="publishSong('${s.id}', false)">✗ Rejeter</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function publishSong(id, publish) {
+  if (publish) await db.from('songs').update({ published: true }).eq('id', id);
+  else await db.from('songs').delete().eq('id', id);
+  loadDashboard();
+}
+
+// =============================================
+// UPLOAD MUSIQUE
+// =============================================
+function onAudioSelected(input) {
+  if (input.files[0]) document.getElementById('audio-filename').textContent = '✓ ' + input.files[0].name;
+}
+
+async function uploadSong() {
+  const title = document.getElementById('song-title').value.trim();
+  const artist = document.getElementById('song-artist').value.trim();
+  const country = document.getElementById('song-country').value;
+  const generation = document.getElementById('song-generation').value;
+  const language = document.getElementById('song-language').value;
+  const genre = document.getElementById('song-genre').value;
+  const year = parseInt(document.getElementById('song-year').value);
+  const isPremium = document.getElementById('song-premium').value === 'true';
+  const lyrics = document.getElementById('song-lyrics').value;
+  const audioFile = document.getElementById('audio-file').files[0];
+  const msg = document.getElementById('upload-message');
+
+  if (!title || !artist || !country || !generation || !language || !genre || !year) {
+    msg.innerHTML = '<span style="color:#e74c3c">Remplis tous les champs obligatoires *</span>'; return;
+  }
+
+  msg.innerHTML = '<span style="color:var(--gold)">⏳ Upload en cours...</span>';
+
+  try {
+    const { data: { user } } = await db.auth.getUser();
+
+    // 1. Trouver ou créer l'artiste
+    let { data: artistData } = await db.from('artists').select('id').eq('name', artist).single();
+    if (!artistData) {
+      const { data: newArtist } = await db.from('artists')
+        .insert({ name: artist, country, generation, published: true, created_by: user.id })
+        .select().single();
+      artistData = newArtist;
+    }
+
+    // 2. Upload du fichier audio
+    let audioUrl = null;
+    if (audioFile) {
+      const filename = `${Date.now()}_${audioFile.name.replace(/\s/g, '_')}`;
+      const { data: uploadData, error: uploadError } = await db.storage
+        .from('audio').upload(filename, audioFile);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = db.storage.from('audio').getPublicUrl(filename);
+      audioUrl = urlData.publicUrl;
+    }
+
+    // 3. Insérer la chanson
+    const { error } = await db.from('songs').insert({
+      title, artist_id: artistData.id, audio_url: audioUrl,
+      year, country, generation, genre, language, lyrics,
+      is_premium: isPremium, published: true, created_by: user.id,
+      duration: 0,
+    });
+
+    if (error) throw error;
+    msg.innerHTML = '<span style="color:var(--green)">✓ Musique publiée avec succès !</span>';
+
+    // Reset form
+    ['song-title','song-artist','song-year','song-lyrics'].forEach(id => document.getElementById(id).value = '');
+    ['song-country','song-generation','song-language','song-genre'].forEach(id => document.getElementById(id).selectedIndex = 0);
+    document.getElementById('audio-filename').textContent = '';
+    document.getElementById('audio-file').value = '';
+
+  } catch(e) {
+    msg.innerHTML = `<span style="color:#e74c3c">Erreur: ${e.message}</span>`;
+  }
+}
+
+// =============================================
+// LISTE MUSIQUES
+// =============================================
+async function loadSongs() {
+  const { data } = await db.from('songs').select('*, artists(name)').order('created_at', { ascending: false }).limit(100);
+  const tbody = document.getElementById('songs-list-body');
+  if (!data?.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted)">Aucune musique</td></tr>'; return; }
+  tbody.innerHTML = data.map(s => `
+    <tr>
+      <td>${s.title}</td>
+      <td>${s.artists?.name || '—'}</td>
+      <td>${s.country}</td>
+      <td>${s.generation}</td>
+      <td>${s.language}</td>
+      <td><span class="badge ${s.published ? 'badge-green' : 'badge-gray'}">${s.published ? 'Publié' : 'Brouillon'}</span>
+          ${s.is_premium ? '<span class="badge badge-gold" style="margin-left:4px">Premium</span>' : ''}</td>
+      <td>${s.plays}</td>
+      <td>
+        <button class="btn-small" onclick="togglePublish('${s.id}', ${!s.published})">${s.published ? 'Dépublier' : 'Publier'}</button>
+        <button class="btn-small btn-danger" onclick="deleteSong('${s.id}')">Supprimer</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function togglePublish(id, state) {
+  await db.from('songs').update({ published: state }).eq('id', id);
+  loadSongs();
+}
+
+async function deleteSong(id) {
+  if (!confirm('Supprimer cette chanson ?')) return;
+  await db.from('songs').delete().eq('id', id);
+  loadSongs();
+}
+
+// =============================================
+// ARTISTES
+// =============================================
+async function loadArtists() {
+  const { data } = await db.from('artists').select('*').order('name');
+  const tbody = document.getElementById('artists-list-body');
+  if (!data?.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Aucun artiste</td></tr>'; return; }
+  tbody.innerHTML = data.map(a => `
+    <tr>
+      <td>${a.name}</td><td>${a.country}</td><td>${a.generation}</td>
+      <td><span class="badge ${a.verified ? 'badge-gold' : 'badge-gray'}">${a.verified ? '✓ Vérifié' : 'Non vérifié'}</span></td>
+      <td>${a.followers}</td>
+      <td><button class="btn-small" onclick="toggleVerify('${a.id}', ${!a.verified})">${a.verified ? 'Dévérifier' : 'Vérifier'}</button></td>
+    </tr>`).join('');
+}
+
+async function toggleVerify(id, state) {
+  await db.from('artists').update({ verified: state }).eq('id', id);
+  loadArtists();
+}
+
+// =============================================
+// UTILISATEURS
+// =============================================
+async function loadUsers() {
+  const { data } = await db.from('profiles').select('*, subscriptions(plan, status)').order('created_at', { ascending: false }).limit(100);
+  const tbody = document.getElementById('users-list-body');
+  if (!data?.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Aucun utilisateur</td></tr>'; return; }
+  tbody.innerHTML = data.map(u => `
+    <tr>
+      <td>${u.email}</td>
+      <td>${u.full_name || '—'}</td>
+      <td><span class="badge ${u.role === 'admin' ? 'badge-red' : u.role === 'premium' ? 'badge-gold' : 'badge-gray'}">${u.role}</span></td>
+      <td>${u.subscriptions?.plan || 'free'}</td>
+      <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
+      <td>
+        <select onchange="changeRole('${u.id}', this.value)" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;">
+          <option ${u.role==='free'?'selected':''}>free</option>
+          <option ${u.role==='premium'?'selected':''}>premium</option>
+          <option ${u.role==='admin'?'selected':''}>admin</option>
+        </select>
+      </td>
+    </tr>`).join('');
+}
+
+async function changeRole(userId, role) {
+  await db.from('profiles').update({ role }).eq('id', userId);
+}
+
+// =============================================
+// REVENUS
+// =============================================
+async function loadRevenue() {
+  const { data: monthly } = await db.from('subscriptions').select('id', { count: 'exact' }).eq('plan', 'monthly').eq('status', 'active');
+  const { data: yearly } = await db.from('subscriptions').select('id', { count: 'exact' }).eq('plan', 'yearly').eq('status', 'active');
+  const mCount = monthly?.length || 0;
+  const yCount = yearly?.length || 0;
+  const mRev = mCount * 2.99;
+  const yRev = yCount * 19.99;
+  const total = mRev + (yRev / 12);
+
+  document.getElementById('rev-monthly').textContent = mRev.toFixed(2) + '€';
+  document.getElementById('rev-yearly-subs').textContent = yRev.toFixed(2) + '€';
+  document.getElementById('rev-total-subs').textContent = mCount + yCount;
+  document.getElementById('rev-total').textContent = total.toFixed(2) + '€/mois';
+}
+</script>
+</body>
+</html>
